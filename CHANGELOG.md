@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.0] - 2026-09-11
+### Added
+- `ultrarecon update` command: checks GitHub Releases for a newer version
+  and can self-update in place via `pip install --upgrade git+...`.
+- Non-blocking update notice printed automatically at the start of `scan`
+  (disable with `--no-update-check`).
+- Interactive "install missing tools now?" prompt when a requested source
+  isn't installed, with a real installer (not just a hint) for pip/go/snap
+  -based tools. Auto-confirm with `-y`/`--yes`, or disable entirely with
+  `--no-install-prompt`.
+- Automatic retry with `--break-system-packages` on PEP 668
+  "externally managed environment" pip errors.
+- `ultrarecon check --install` to audit *and* fix tool availability in one step.
+
+### Fixed
+- The PyPI `theHarvester` package is a stale, unmaintained stub (`0.0.1`)
+  that does **not** install the real tool. The installer and docs now point
+  to `pip install git+https://github.com/laramies/theHarvester.git` instead.
+
 ## [1.0.0] - 2026-09-11
 ### Added
 - Initial public release.

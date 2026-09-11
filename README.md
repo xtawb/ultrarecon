@@ -46,7 +46,7 @@ skipped):
 
 | Tool | Purpose | Install |
 |---|---|---|
-| [theHarvester](https://github.com/laramies/theHarvester) | OSINT: hosts, emails, ASNs, IPs | `pip install theHarvester` |
+| [theHarvester](https://github.com/laramies/theHarvester) | OSINT: hosts, emails, ASNs, IPs | `pip install git+https://github.com/laramies/theHarvester.git` (the PyPI `theHarvester` package is a stale stub — don't use it) |
 | [amass](https://github.com/owasp-amass/amass) | Active + passive subdomain enum | `snap install amass` |
 | [sublist3r](https://github.com/aboul3la/Sublist3r) | Passive subdomain enum | `pip install sublist3r` |
 | [subfinder](https://github.com/projectdiscovery/subfinder) | Passive subdomain enum | `go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest` |
@@ -79,6 +79,38 @@ ultrarecon scan -d example.com --no-probe
 
 # Custom output directory, ports, and thread count
 ultrarecon scan -d example.com -o ./results --ports 80,443,8443 --threads 300
+
+# Auto-confirm any install/update prompts (useful for CI or scripted runs)
+ultrarecon scan -d example.com --yes
+```
+
+### Missing tools? UltraRecon offers to install them
+
+If a source you asked for isn't installed, `scan` (and `check --install`)
+will ask before doing anything:
+
+```
+Missing tools: theharvester, amass
+Install them automatically now? [y/N]:
+```
+
+Answering `y` runs each tool's best-known install command (pip, go install,
+or snap, whichever applies), transparently retries with
+`--break-system-packages` on PEP 668 "externally managed" systems, and
+reports exactly what failed for anything it can't handle automatically
+(e.g. amass needs snap or a Go toolchain — neither is assumed to exist).
+Pass `-y`/`--yes` to skip the prompt and always install, or
+`--no-install-prompt` to never be asked.
+
+### Keeping UltraRecon itself up to date
+
+Every `scan` does a quick, non-blocking check against the project's GitHub
+Releases and prints a one-line notice if a newer version exists (disable
+with `--no-update-check`). To update on demand:
+
+```bash
+ultrarecon update           # checks, then asks before installing
+ultrarecon update --yes     # checks and updates without asking
 ```
 
 ### Output layout

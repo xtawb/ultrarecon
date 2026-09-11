@@ -217,7 +217,7 @@ ALL_SOURCES: dict[str, type[Source]] = {
 }
 
 INSTALL_HINTS = {
-    "theharvester": "pip install theHarvester",
+    "theharvester": "pip install 'git+https://github.com/laramies/theHarvester.git'  (the PyPI 'theHarvester' package is a stale stub — don't use it)",
     "amass": "snap install amass  |  go install github.com/owasp-amass/amass/v4/...@master",
     "sublist3r": "pip install sublist3r",
     "subfinder": "go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
