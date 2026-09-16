@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.1] - 2026-09-16
+### Fixed
+- `ultrarecon update` failed outright on PEP 668 "externally managed
+  environment" systems (Kali, Debian, etc.) with `error:
+  externally-managed-environment`, even though `installer.py` already had
+  the `--break-system-packages` retry fallback for individual tools --
+  `updater.self_update()` had never gotten the same treatment. It now
+  retries with `--break-system-packages` exactly like tool installation
+  does, reported live by a user hitting it on Kali.
+
 ## [1.2.0] - 2026-09-16
 ### Added
 - **DNS subdomain bruteforce** (`--bruteforce`): wordlist-driven, concurrent,

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ultrarecon"
-version = "1.2.0"
+version = "1.2.1"
 description = "Multi-phase subdomain enumeration (passive, DNS bruteforce, recursive wildcard-driven deep enumeration) and live-host triage for authorized security recon."
 readme = "README.md"
 requires-python = ">=3.10"

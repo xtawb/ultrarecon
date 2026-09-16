@@ -50,12 +50,29 @@ def check_for_update(timeout: int = 5) -> tuple[bool, str | None]:
 
 
 def self_update(ref: str = "main") -> tuple[bool, str]:
-    """Upgrade the installed package in place via pip + git."""
-    cmd = [sys.executable, "-m", "pip", "install", "--upgrade", f"git+{GIT_URL}@{ref}"]
+    """Upgrade the installed package in place via pip + git.
+
+    Retries once with --break-system-packages on PEP 668
+    "externally managed environment" systems (Kali, Debian, etc.) --
+    the same fallback installer.py already uses for individual tools.
+    """
+    base_cmd = [sys.executable, "-m", "pip", "install", "--upgrade", f"git+{GIT_URL}@{ref}"]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
+        proc = subprocess.run(base_cmd, capture_output=True, text=True, timeout=300, check=False)
     except (subprocess.TimeoutExpired, OSError) as exc:
         return False, str(exc)
+
     if proc.returncode == 0:
         return True, proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else "updated"
-    return False, (proc.stderr.strip() or "pip install failed")[:400]
+
+    if "externally-managed-environment" in proc.stderr:
+        fallback_cmd = [*base_cmd, "--break-system-packages"]
+        try:
+            proc = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=300, check=False)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            return False, str(exc)
+        if proc.returncode == 0:
+            last_line = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else "updated"
+            return True, f"{last_line} (--break-system-packages)"
+
+    return False, (proc.stderr.strip() or proc.stdout.strip() or "pip install failed")[:400]
