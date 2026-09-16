@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.0] - 2026-09-16
+### Added
+- **Large wordlist support from GitHub** (`ultrarecon wordlists`): `--wordlist`
+  now accepts a registry name or a raw http(s) URL, not just a local path.
+  Eleven well-known, verified wordlists (SecLists, n0kovo_subdomains,
+  Assetnote commonspeak2 -- from 5,000 up to 3,000,000 lines) are fetched
+  from their authoritative GitHub sources on first use and cached under
+  `~/.cache/ultrarecon/wordlists/`. New subcommands: `ultrarecon wordlists
+  list` and `ultrarecon wordlists get <name> [--force]`.
+- Downloads stream to a temp file and are only moved into the cache on
+  success, so an interrupted download never leaves a corrupt cached file.
+- 15 new tests (`test_wordlist_fetch.py` + CLI parsing tests) -- 76 total,
+  up from 62.
+
+### Notes
+- Existing `--wordlist path/to/file.txt` behavior is completely
+  unchanged -- registry names and URLs are additive, resolved before the
+  existing local-file loading logic even runs.
+- Verified live: downloaded `seclists-5k` and `seclists-20k` for real,
+  confirmed exact line counts, and ran a real bruteforce scan against
+  python.org with an auto-fetched wordlist (found 17 real subdomains).
+
 ## [1.2.1] - 2026-09-16
 ### Fixed
 - `ultrarecon update` failed outright on PEP 668 "externally managed

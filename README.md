@@ -41,6 +41,11 @@ architecture rather than copied wholesale.
 - **Custom resolvers, concurrency limits, and rate limiting** — all
   configurable, so bruteforce/deep enumeration stays bounded and doesn't
   hammer anyone's DNS infrastructure.
+- **On-demand large wordlists from GitHub.** `--wordlist` accepts a
+  registry name (`ultrarecon wordlists list`) or a raw URL, not just a
+  local path — real lists from SecLists, n0kovo_subdomains, and Assetnote
+  commonspeak2 (5,000 to 3,000,000 lines) are fetched and cached
+  automatically on first use.
 - **Runs passive sources concurrently**, not one after another.
 - **No `jq` dependency.** crt.sh and theHarvester-JSON parsing are done
   in pure Python.
@@ -178,7 +183,8 @@ Misc:
 ```
 
 Full help for every subcommand: `ultrarecon scan --help`,
-`ultrarecon check --help`, `ultrarecon update --help`.
+`ultrarecon check --help`, `ultrarecon update --help`,
+`ultrarecon wordlists --help`.
 
 ## Bruteforce usage
 
@@ -199,6 +205,53 @@ filtered out as DNS noise, not reported as a real subdomain.
 ```bash
 ultrarecon scan -d example.com --bruteforce --wordlist big-list.txt --concurrency 100
 ```
+
+### Large wordlists
+
+The wordlist bundled with UltraRecon (~350 entries) is intentionally
+small — shipping a multi-million-line file in the package would bloat
+every install for people who never use it. For real bruteforce/deep
+enumeration work, `--wordlist` also accepts the name of a well-known
+large wordlist, which is fetched from its authoritative GitHub source
+and cached locally the first time you use it:
+
+```bash
+# See what's available and whether it's already cached
+ultrarecon wordlists list
+
+# Fetch one ahead of time (optional -- scan will fetch it automatically too)
+ultrarecon wordlists get seclists-20k
+
+# Use it directly
+ultrarecon scan -d example.com --bruteforce --wordlist seclists-20k
+ultrarecon scan -d example.com --deep --wordlist n0kovo-huge --max-depth 2
+
+# A raw GitHub (or any raw http(s)) URL works too, e.g. your own private list
+ultrarecon scan -d example.com --bruteforce \
+  --wordlist https://raw.githubusercontent.com/you/yourlist/main/words.txt
+```
+
+| Name | Lines | Source |
+|---|---|---|
+| `seclists-5k` | 5,000 | SecLists top 5k (Alexa-derived) |
+| `seclists-20k` | 20,000 | SecLists top 20k |
+| `seclists-110k` | 110,000 | SecLists top 110k |
+| `bitquark-100k` | 100,000 | SecLists / bitquark observed subdomains |
+| `deepmagic-50k` | 49,928 | SecLists deepmagic.com prefixes |
+| `seclists-namelist` | 151,265 | SecLists combined namelist |
+| `commonspeak2` | 484,701 | Assetnote commonspeak2 (real BigQuery-mined data) |
+| `n0kovo-small` | 200,000 | n0kovo_subdomains small tier |
+| `n0kovo-medium` | 500,000 | n0kovo_subdomains medium tier |
+| `jhaddix` | 2,171,687 | Jason Haddix's all_dns list (~25 MB) |
+| `n0kovo-huge` | 3,000,000 | n0kovo_subdomains huge tier (~50 MB) |
+
+Downloads are cached under `~/.cache/ultrarecon/wordlists/` and reused
+on every future run; pass `--force` to `wordlists get` to refresh one.
+A failed or interrupted download never leaves a corrupt cached file —
+it's written to a temp file first and only moved into place once
+complete. A larger wordlist means more DNS traffic, so pair it with
+`--rate-limit` and a sane `--concurrency` for the target you're
+authorized to test.
 
 ## Wildcard / deep enumeration
 
@@ -328,6 +381,7 @@ ultrarecon/
 ├── dns_engine.py        # unified DNS queries: NXDOMAIN/SERVFAIL/timeout,
 │                           custom resolvers, rate limiting
 ├── bruteforce.py          # DNS subdomain bruteforce
+├── wordlist_fetch.py        # fetch/cache large wordlists from GitHub
 ├── deep.py                  # recursive wildcard-driven deep enumeration
 ├── resolver.py                # wildcard detection + concurrent resolution
 ├── probe.py                     # httpx wrapper (alive + tech-detect)
@@ -355,11 +409,12 @@ ruff check ultrarecon tests
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for full release notes. Highlights of
-the current release (v1.2.0): DNS bruteforce, recursive wildcard-driven
-deep enumeration, escaped-domain parsing, CDN-rotation-aware wildcard
-detection, a rebuilt DNS engine (NXDOMAIN/SERVFAIL/timeout, custom
-resolvers, rate limiting), phase-based CLI (`--passive/--bruteforce/
---deep/--all`), and phase-timed reports.
+the current release (v1.3.0): on-demand large wordlists from GitHub
+(`ultrarecon wordlists`) on top of v1.2.0's DNS bruteforce, recursive
+wildcard-driven deep enumeration, escaped-domain parsing,
+CDN-rotation-aware wildcard detection, a rebuilt DNS engine
+(NXDOMAIN/SERVFAIL/timeout, custom resolvers, rate limiting), phase-based
+CLI (`--passive/--bruteforce/--deep/--all`), and phase-timed reports.
 
 ## Legal
 

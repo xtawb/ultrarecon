@@ -4,13 +4,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__
+from . import __version__, wordlist_fetch
 from .core import Scanner, ScanOptions, check_availability
 from .installer import offer_install
 from .sources import ALL_SOURCES, INSTALL_HINTS
 from .updater import check_for_update, self_update
 from .utils import Palette as P
-from .utils import is_valid_domain, normalize_domain, which
+from .utils import get_logger, is_valid_domain, normalize_domain, which
 
 
 def _parse_resolvers(raw: str | None) -> list[str] | None:
@@ -70,8 +70,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     dns_opts = scan.add_argument_group("DNS / bruteforce / deep options")
     dns_opts.add_argument(
-        "--wordlist", default=None, metavar="PATH",
-        help="wordlist for --bruteforce/--deep (default: built-in list)",
+        "--wordlist", default=None, metavar="PATH|NAME|URL",
+        help="wordlist for --bruteforce/--deep: a local file path, the name of a "
+             "wordlist from `ultrarecon wordlists list` (auto-downloaded and "
+             "cached on first use), or a raw http(s) URL (default: built-in list)",
     )
     dns_opts.add_argument(
         "--concurrency", type=int, default=50, metavar="N",
@@ -124,6 +126,23 @@ def build_parser() -> argparse.ArgumentParser:
     update = sub.add_parser("update", help="check for a newer release and optionally install it")
     update.add_argument("-y", "--yes", action="store_true", help="apply the update without asking")
 
+    wordlists = sub.add_parser(
+        "wordlists",
+        help="browse and fetch large subdomain wordlists from GitHub",
+        description=(
+            "Manage the wordlists usable with `scan --wordlist`. The bundled "
+            "default list is small on purpose; real large lists (SecLists, "
+            "n0kovo_subdomains, commonspeak2 -- up to millions of entries) are "
+            "fetched from their authoritative GitHub sources on demand and "
+            f"cached under {wordlist_fetch.CACHE_DIR}."
+        ),
+    )
+    wl_sub = wordlists.add_subparsers(dest="wordlists_command", required=True)
+    wl_sub.add_parser("list", help="show every available wordlist and whether it's cached")
+    wl_get = wl_sub.add_parser("get", help="download (or re-download) a wordlist into the cache")
+    wl_get.add_argument("name", help="registry name (see `ultrarecon wordlists list`) or a raw http(s) URL")
+    wl_get.add_argument("--force", action="store_true", help="re-download even if already cached")
+
     sub.add_parser("version", help="print the version and exit")
     return p
 
@@ -153,6 +172,34 @@ def cmd_check(args: argparse.Namespace) -> int:
         missing = [name for name, ok in avail.items() if not ok and name != "virustotal"]
         offer_install(missing, assume_yes=args.yes)
     return 0
+
+
+def cmd_wordlists(args: argparse.Namespace) -> int:
+    if args.wordlists_command == "list":
+        print(P.bold("Available wordlists:"))
+        print(f"{P.dim(f'Cache directory: {wordlist_fetch.CACHE_DIR}')}\n")
+        for src, cached in wordlist_fetch.list_registry():
+            status = P.green("cached") if cached else P.dim("not downloaded")
+            print(f"  {src.name:<20} {src.lines:>10,} lines  [{status}]")
+            print(f"    {P.dim(src.description)}")
+        print(f"\nFetch one with: {P.bold('ultrarecon wordlists get <name>')}")
+        print(f"Use it directly with: {P.bold('ultrarecon scan -d example.com --bruteforce --wordlist <name>')}")
+        return 0
+
+    if args.wordlists_command == "get":
+        logger = get_logger()
+        try:
+            if args.name.startswith("http://") or args.name.startswith("https://"):
+                path = wordlist_fetch.get_from_url(args.name, force=args.force, logger=logger)
+            else:
+                path = wordlist_fetch.get(args.name, force=args.force, logger=logger)
+        except wordlist_fetch.WordlistFetchError as exc:
+            print(P.red(str(exc)), file=sys.stderr)
+            return 1
+        print(P.green(f"Ready: {path}"))
+        return 0
+
+    return 1
 
 
 def cmd_update(args: argparse.Namespace) -> int:
@@ -227,6 +274,14 @@ def cmd_scan(args: argparse.Namespace) -> int:
         if missing:
             offer_install(missing, assume_yes=args.yes)
 
+    wordlist_path = args.wordlist
+    if (bruteforce or deep) and args.wordlist:
+        try:
+            wordlist_path = wordlist_fetch.resolve(args.wordlist, logger=get_logger())
+        except wordlist_fetch.WordlistFetchError as exc:
+            print(P.red(str(exc)), file=sys.stderr)
+            return 1
+
     outdir = Path(args.outdir) if args.outdir else Path("out") / domain
     opts = ScanOptions(
         domain=domain,
@@ -239,7 +294,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
         probe_alive=not args.no_probe,
         ports=args.ports,
         threads=args.threads,
-        wordlist=args.wordlist,
+        wordlist=wordlist_path,
         concurrency=args.concurrency,
         dns_timeout=args.dns_timeout,
         dns_retries=args.dns_retries,
@@ -274,6 +329,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_check(args)
     if args.command == "update":
         return cmd_update(args)
+    if args.command == "wordlists":
+        return cmd_wordlists(args)
     if args.command == "version":
         print(__version__)
         return 0

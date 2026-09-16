@@ -79,3 +79,41 @@ def test_scan_parses_new_options():
     assert args.rate_limit == 5
     assert args.dns_timeout == 2.5
     assert args.dns_retries == 2
+
+
+def test_wordlists_list_parses():
+    parser = build_parser()
+    args = parser.parse_args(["wordlists", "list"])
+    assert args.command == "wordlists"
+    assert args.wordlists_command == "list"
+
+
+def test_wordlists_get_parses():
+    parser = build_parser()
+    args = parser.parse_args(["wordlists", "get", "seclists-5k"])
+    assert args.wordlists_command == "get"
+    assert args.name == "seclists-5k"
+    assert args.force is False
+
+
+def test_wordlists_get_force_flag():
+    parser = build_parser()
+    args = parser.parse_args(["wordlists", "get", "seclists-5k", "--force"])
+    assert args.force is True
+
+
+def test_wordlists_requires_subcommand():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["wordlists"])
+
+
+def test_scan_wordlist_accepts_registry_name_or_url():
+    parser = build_parser()
+    args = parser.parse_args(["scan", "-d", "example.com", "--bruteforce", "--wordlist", "seclists-5k"])
+    assert args.wordlist == "seclists-5k"
+    args2 = parser.parse_args([
+        "scan", "-d", "example.com", "--bruteforce",
+        "--wordlist", "https://raw.githubusercontent.com/x/y/main/list.txt",
+    ])
+    assert args2.wordlist.startswith("https://")
