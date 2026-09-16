@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -39,17 +41,40 @@ class Palette:
     def dim(cls, t): return cls.wrap("2", t)
 
 
-def get_logger(name: str = "ultrarecon", verbose: bool = False) -> logging.Logger:
+def get_logger(
+    name: str = "ultrarecon",
+    verbose: bool = False,
+    quiet: bool = False,
+    debug: bool = False,
+) -> logging.Logger:
     logger = logging.getLogger(name)
-    if logger.handlers:
-        return logger
-    handler = logging.StreamHandler(sys.stdout)
-    fmt = "%(asctime)s %(levelname)-7s %(message)s"
-    handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG if verbose else logging.INFO)
-    logger.propagate = False
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        fmt = "%(asctime)s %(levelname)-7s %(message)s"
+        handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
+        logger.addHandler(handler)
+        logger.propagate = False
+
+    if debug:
+        level = logging.DEBUG
+    elif quiet:
+        level = logging.WARNING
+    elif verbose:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+    logger.setLevel(level)
     return logger
+
+
+@contextlib.contextmanager
+def phase_timer(store: dict, name: str):
+    """Record how long a `with phase_timer(report.phases, 'passive'):` block took."""
+    start = time.monotonic()
+    try:
+        yield
+    finally:
+        store[name] = round(time.monotonic() - start, 3)
 
 
 _DOMAIN_RE = re.compile(
